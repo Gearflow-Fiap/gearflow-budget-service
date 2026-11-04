@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+**/bin/
+**/obj/
+**/TestResults/
+.vs/
+*.user
+*.suo
+**/.data/
+**/*.feature.cs
+.local/
+*.local.json
+erl_crash.dump

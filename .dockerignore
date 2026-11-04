@@ -1,0 +1,12 @@
+.git
+**/bin
+**/obj
+**/TestResults
+.env
+.env.*
+tests
+docs
+**/.data
+.local
+*.local.json
+erl_crash.dump
