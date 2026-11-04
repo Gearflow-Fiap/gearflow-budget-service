@@ -1,0 +1,11 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/v1/orders/ORDTIMEOUT"
+  },
+  "response": {
+    "fixedDelayMilliseconds": 11000,
+    "jsonBody": {},
+    "status": 200
+  }
+}

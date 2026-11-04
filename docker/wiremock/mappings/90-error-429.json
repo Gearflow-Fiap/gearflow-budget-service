@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/v1/orders/ORDERROR429"
+  },
+  "response": {
+    "headers": {
+      "Retry-After": "0",
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "error": "local-test-error"
+    },
+    "status": 429
+  }
+}

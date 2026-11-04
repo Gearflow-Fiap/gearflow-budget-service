@@ -1,0 +1,92 @@
+name: Billing delivery
+on:
+  workflow_run:
+    workflows: [Billing CI]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: billing-production
+  cancel-in-progress: false
+jobs:
+  image:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: write}
+    outputs:
+      image: ${{ steps.metadata.outputs.image }}
+      tag: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.event.workflow_run.head_sha }}'}
+      - name: Require configured quality gate and supported runtime
+        env:
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: |
+          test -n "$SONAR_PROJECT_KEY" || { echo 'Configure SonarCloud before publishing.'; exit 1; }
+          if ! grep -q '<TargetFramework>net10.0</TargetFramework>' Directory.Build.props || [[ "$(date -u +%F)" > "2028-11-13" ]]; then
+            echo 'Review the supported runtime before publishing.'
+            exit 1
+          fi
+      - id: metadata
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/GearFlow.Billing.Api/Dockerfile
+          push: true
+          tags: '${{ steps.metadata.outputs.image }}:${{ github.event.workflow_run.head_sha }}'
+  deploy:
+    needs: image
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.event.workflow_run.head_sha }}'}
+      - name: Validate environment configuration
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBECONFIG_BASE64 }}
+          KUBECTL_VERSION: ${{ vars.KUBECTL_VERSION }}
+          HOST: ${{ vars.BILLING_HOST }}
+        run: |
+          test -n "$KUBE_CONFIG" && test -n "$KUBECTL_VERSION" && test -n "$HOST"
+          test "$HOST" != billing.example.invalid
+          [[ "$HOST" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] && [[ "$HOST" != *..* ]]
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ vars.KUBECTL_VERSION }}
+      - uses: imranismail/setup-kustomize@v2
+        with: {kustomize-version: 5.7.1}
+      - name: Render, validate and deploy immutable image
+        env:
+          IMAGE: ${{ needs.image.outputs.image }}
+          TAG: ${{ needs.image.outputs.tag }}
+          BILLING_HOST: ${{ vars.BILLING_HOST }}
+        run: |
+          cd k8s/base
+          kustomize edit set image "gearflow-billing=$IMAGE:$TAG"
+          kubectl kustomize . | sed "s/billing.example.invalid/$BILLING_HOST/g" > /tmp/billing-rendered.yaml
+          kubectl get secret gearflow-billing-secrets gearflow-billing-tls -n gearflow >/dev/null
+          kubectl apply --dry-run=server -f /tmp/billing-rendered.yaml
+          kubectl apply -f /tmp/billing-rendered.yaml
+          kubectl rollout status deployment/gearflow-billing -n gearflow --timeout=300s
+      - name: Smoke readiness through internal Service
+        run: |
+          kubectl port-forward -n gearflow service/gearflow-billing 18080:80 >/tmp/port-forward.log 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid"' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:18080/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1

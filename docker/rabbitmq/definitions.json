@@ -1,0 +1,205 @@
+{
+  "exchanges": [
+    {
+      "name": "gearflow.commands.v1",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gearflow.events.v1",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "gearflow.deadletters.v1",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "gearflow.billing.commands.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.billing.commands.v1.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.execution.commands.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.execution.commands.v1.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.os.billing.events.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.os.billing.events.v1.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.os.execution.events.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.os.execution.events.v1.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.os.events.v1",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "gearflow.os.events.v1.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "classic"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "gearflow.commands.v1",
+      "vhost": "/",
+      "destination": "gearflow.billing.commands.v1",
+      "destination_type": "queue",
+      "routing_key": "billing.*",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.deadletters.v1",
+      "vhost": "/",
+      "destination": "gearflow.billing.commands.v1.dlq",
+      "destination_type": "queue",
+      "routing_key": "gearflow.billing.commands.v1",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.commands.v1",
+      "vhost": "/",
+      "destination": "gearflow.execution.commands.v1",
+      "destination_type": "queue",
+      "routing_key": "execution.*",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.deadletters.v1",
+      "vhost": "/",
+      "destination": "gearflow.execution.commands.v1.dlq",
+      "destination_type": "queue",
+      "routing_key": "gearflow.execution.commands.v1",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.events.v1",
+      "vhost": "/",
+      "destination": "gearflow.os.billing.events.v1",
+      "destination_type": "queue",
+      "routing_key": "gearflow-budget-service.*",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.deadletters.v1",
+      "vhost": "/",
+      "destination": "gearflow.os.billing.events.v1.dlq",
+      "destination_type": "queue",
+      "routing_key": "gearflow.os.billing.events.v1",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.events.v1",
+      "vhost": "/",
+      "destination": "gearflow.os.execution.events.v1",
+      "destination_type": "queue",
+      "routing_key": "gearflow-execution-service.*",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.deadletters.v1",
+      "vhost": "/",
+      "destination": "gearflow.os.execution.events.v1.dlq",
+      "destination_type": "queue",
+      "routing_key": "gearflow.os.execution.events.v1",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.events.v1",
+      "vhost": "/",
+      "destination": "gearflow.os.events.v1",
+      "destination_type": "queue",
+      "routing_key": "gearflow-os-service.*",
+      "arguments": {}
+    },
+    {
+      "source": "gearflow.deadletters.v1",
+      "vhost": "/",
+      "destination": "gearflow.os.events.v1.dlq",
+      "destination_type": "queue",
+      "routing_key": "gearflow.os.events.v1",
+      "arguments": {}
+    }
+  ]
+}

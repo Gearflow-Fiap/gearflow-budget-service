@@ -1,0 +1,61 @@
+{
+  "scenarioName": "billing-pix",
+  "newScenarioState": "pending",
+  "requiredScenarioState": "Started",
+  "response": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "id": "ORDLOCAL001",
+      "external_reference": "01234567-0123-4123-8123-012345678901",
+      "transactions": {
+        "refunds": [],
+        "payments": [
+          {
+            "amount": "350.00",
+            "payment_method": {
+              "qr_code": "LOCAL-PIX-NOT-PAYABLE",
+              "type": "bank_transfer",
+              "ticket_url": "https://example.com/local-pix",
+              "id": "pix"
+            },
+            "id": "PAYLOCAL001",
+            "status_detail": "waiting_transfer",
+            "status": "action_required"
+          }
+        ]
+      },
+      "total_amount": "350.00",
+      "created_date": "2026-11-02T12:00:00Z",
+      "currency_id": "BRL",
+      "type": "online",
+      "status": "action_required",
+      "status_detail": "waiting_transfer"
+    },
+    "status": 201
+  },
+  "request": {
+    "urlPath": "/v1/orders",
+    "method": "POST",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "equalTo": "01234567-0123-4123-8123-012345678901",
+          "expression": "$.external_reference"
+        }
+      },
+      {
+        "matchesJsonPath": {
+          "equalTo": "350.00",
+          "expression": "$.total_amount"
+        }
+      }
+    ],
+    "headers": {
+      "X-Idempotency-Key": {
+        "matches": "[a-fA-F0-9-]{36}"
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "scenarioName": "billing-pix",
+  "newScenarioState": "canceled",
+  "requiredScenarioState": "pending",
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "status": "canceled",
+      "id": "ORDLOCAL001"
+    }
+  },
+  "request": {
+    "urlPath": "/v1/orders/ORDLOCAL001/cancel",
+    "method": "POST",
+    "headers": {
+      "X-Idempotency-Key": {
+        "matches": "[a-fA-F0-9-]{36}"
+      }
+    }
+  }
+}

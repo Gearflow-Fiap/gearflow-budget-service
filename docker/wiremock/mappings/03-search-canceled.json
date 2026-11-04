@@ -1,0 +1,29 @@
+{
+  "scenarioName": "billing-pix",
+  "response": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "paging": {
+        "total": 1
+      },
+      "data": [
+        {
+          "id": "ORDLOCAL001"
+        }
+      ]
+    },
+    "status": 200
+  },
+  "requiredScenarioState": "canceled",
+  "request": {
+    "urlPath": "/v1/orders",
+    "method": "GET",
+    "queryParameters": {
+      "external_reference": {
+        "equalTo": "01234567-0123-4123-8123-012345678901"
+      }
+    }
+  }
+}

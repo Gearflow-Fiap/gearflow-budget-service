@@ -1,0 +1,27 @@
+{
+  "scenarioName": "billing-pix",
+  "newScenarioState": "refunded",
+  "requiredScenarioState": "paid",
+  "response": {
+    "status": 201,
+    "jsonBody": {
+      "id": "ORDLOCAL001",
+      "status_detail": "refunded",
+      "status": "processed"
+    }
+  },
+  "request": {
+    "urlPath": "/v1/orders/ORDLOCAL001/refund",
+    "method": "POST",
+    "headers": {
+      "X-Idempotency-Key": {
+        "matches": "[a-fA-F0-9-]{36}"
+      }
+    },
+    "bodyPatterns": [
+      {
+        "equalToJson": "{}"
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gearflow-billing
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 64k
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "25"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [billing.example.invalid]
+      secretName: gearflow-billing-tls
+  rules:
+    - host: billing.example.invalid
+      http:
+        paths:
+          - path: /api/budgets
+            pathType: Prefix
+            backend: {service: {name: gearflow-billing, port: {name: http}}}
+          - path: /api/payments
+            pathType: Prefix
+            backend: {service: {name: gearflow-billing, port: {name: http}}}

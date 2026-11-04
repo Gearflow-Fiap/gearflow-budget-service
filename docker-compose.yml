@@ -1,0 +1,117 @@
+services:
+  mongo:
+    image: mongo:7.0.16
+    command: [mongod, --replSet, rs0, --bind_ip_all]
+    ports: ["127.0.0.1:27017:27017"]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  mongo-init:
+    image: mongo:7.0.16
+    depends_on:
+      mongo: {condition: service_healthy}
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        mongosh --host mongo:27017 --quiet --eval 'try { rs.status() } catch(e) { if(e.codeName === "NotYetInitialized") { rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]}) } else { throw e } }'
+        until mongosh --host mongo:27017 --quiet --eval 'if (!db.hello().isWritablePrimary) quit(1)'; do sleep 2; done
+  rabbitmq:
+    image: rabbitmq:4.2.0-management
+    hostname: rabbitmq
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-gearflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-gearflow-local}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD-SHELL, "rabbitmq-diagnostics -q ping && rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+  rabbitmq-init:
+    image: curlimages/curl:8.12.1
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+    environment:
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-gearflow}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-gearflow-local}
+    volumes:
+      - ./docker/rabbitmq/definitions.json:/definitions.json:ro
+    restart: "no"
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        curl --fail-with-body --retry 10 --retry-connrefused --retry-delay 2 --user "$RABBITMQ_USERNAME:$RABBITMQ_PASSWORD" --header 'Content-Type: application/json' --data-binary @/definitions.json http://rabbitmq:15672/api/definitions
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
+  wiremock:
+    image: wiremock/wiremock:3.9.2
+    ports: ["127.0.0.1:8089:8080"]
+    volumes:
+      - ./docker/wiremock/mappings:/home/wiremock/mappings:ro
+  billing-api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: src/GearFlow.Billing.Api/Dockerfile
+    ports: ["127.0.0.1:5080:8080"]
+    depends_on:
+      mongo-init: {condition: service_completed_successfully}
+      rabbitmq-init: {condition: service_completed_successfully}
+      mailpit: {condition: service_started}
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Mongo: mongodb://mongo:27017/?replicaSet=rs0
+      Mongo__Database: gearflow_billing
+      RabbitMq__Enabled: "true"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__VirtualHost: /
+      RabbitMq__Username: ${RABBITMQ_USERNAME:-gearflow}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-gearflow-local}
+      RabbitMq__CommandsExchange: gearflow.commands.v1
+      RabbitMq__EventsExchange: gearflow.events.v1
+      RabbitMq__CommandsQueue: gearflow.billing.commands.v1
+      RabbitMq__DeadLetterExchange: gearflow.deadletters.v1
+      Email__Host: mailpit
+      Email__Enabled: "true"
+      Email__Port: 1025
+      Billing__PublicBaseUrl: http://localhost:5080
+      Billing__ApprovalTokenSecret: ${BILLING_APPROVAL_TOKEN_SECRET:-local-only-change-before-sharing-32bytes}
+      MercadoPago__UseMock: ${MERCADO_PAGO_USE_MOCK:-true}
+      MercadoPago__Enabled: ${MERCADO_PAGO_ENABLED:-true}
+      MercadoPago__TestMode: ${MERCADO_PAGO_TEST_MODE:-false}
+      MercadoPago__WebhookEnabled: ${MERCADO_PAGO_WEBHOOK_ENABLED:-true}
+      MercadoPago__BaseUrl: ${MERCADO_PAGO_BASE_URL:-http://wiremock:8080}
+      MercadoPago__AccessToken: ${MERCADO_PAGO_ACCESS_TOKEN:-wiremock-local-access-token}
+      MercadoPago__WebhookSecret: ${MERCADO_PAGO_WEBHOOK_SECRET:-wiremock-local-webhook-secret}
+      MercadoPago__NotificationUrl: ${MERCADO_PAGO_NOTIFICATION_URL:-http://localhost:5080/api/payments/webhook}
+      Jwt__Authority: ${JWT_AUTHORITY:-}
+      Jwt__Mode: ${JWT_MODE:-Hmac}
+      Jwt__Issuer: ${JWT_ISSUER:-GearFlow.Api}
+      Jwt__Audience: ${JWT_AUDIENCE:-GearFlow.Client}
+      Jwt__Secret: ${JWT_SECRET:-local-only-jwt-secret-change-before-sharing}
+      BillingHttp__Enabled: "true"
+      DataProtection__KeyPath: /keys
+      Telemetry__Enabled: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    volumes:
+      - billing-keys:/keys
+  otel-collector:
+    image: otel/opentelemetry-collector:0.123.0
+    command: [--config=/etc/otelcol/config.yaml]
+    volumes:
+      - ./docker/otel/config.yaml:/etc/otelcol/config.yaml:ro
+volumes:
+  mongo-data:
+  rabbitmq-data:
+  billing-keys:
+

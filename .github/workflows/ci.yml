@@ -1,0 +1,68 @@
+name: Billing CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - run: dotnet restore GearFlow.Billing.sln
+      - run: dotnet build GearFlow.Billing.sln -c Release --no-restore
+      - run: dotnet test GearFlow.Billing.sln -c Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings --logger trx
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: '**/TestResults/**'
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - run: dotnet test tests/GearFlow.Billing.IntegrationTests -c Release --filter 'FullyQualifiedName~MongoPaymentPersistenceTests|FullyQualifiedName~RabbitInfrastructureTests|FullyQualifiedName~BillingFlowInfrastructureTests|FullyQualifiedName~MessagingRecoveryTests' --logger trx --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+        env:
+          GEARFLOW_USE_TESTCONTAINERS: "true"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: infrastructure-test-results
+          path: '**/TestResults/**'
+  sonar:
+    if: vars.SONAR_PROJECT_KEY != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          dotnet-version: 10.0.x
+      - run: dotnet tool restore
+      - name: Analyze and enforce quality gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORG: ${{ vars.SONAR_ORG }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          GEARFLOW_USE_TESTCONTAINERS: "true"
+        run: |
+          test -n "$SONAR_TOKEN" && test -n "$SONAR_ORG"
+          dotnet sonarscanner begin /k:"$SONAR_PROJECT_KEY" /o:"$SONAR_ORG" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url=https://sonarcloud.io /d:sonar.cs.opencover.reportsPaths="tests/**/TestResults/**/coverage.opencover.xml" /d:sonar.qualitygate.wait=true
+          dotnet build GearFlow.Billing.sln -c Release
+          dotnet test GearFlow.Billing.sln -c Release --no-build --collect:"XPlat Code Coverage" --settings coverlet.runsettings
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Kubernetes resources
+        run: kubectl kustomize k8s/base | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary

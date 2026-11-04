@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gearflow-billing
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_HTTP_PORTS: "8080"
+  MercadoPago__Enabled: "true"
+  MercadoPago__UseMock: "true"
+  MercadoPago__BaseUrl: https://api.mercadopago.com/
+  BillingHttp__Enabled: "true"
+  Billing__PublicBaseUrl: https://billing.example.invalid
+  RabbitMq__Enabled: "true"
+  RabbitMq__Host: rabbitmq.gearflow.svc.cluster.local
+  RabbitMq__Port: "5671"
+  RabbitMq__Tls: "true"
+  RabbitMq__QueueType: quorum
+  RabbitMq__CommandsExchange: gearflow.commands.v1
+  RabbitMq__EventsExchange: gearflow.events.v1
+  RabbitMq__DeadLetterExchange: gearflow.deadletters.v1
+  RabbitMq__CommandsQueue: gearflow.billing.commands.v1
+  RabbitMq__EventsQueue: gearflow.os.billing.events.v1
+  Mongo__Database: gearflow_billing
+  Email__Enabled: "true"
+  Email__EnableSsl: "true"
+  Jwt__Mode: Hmac
+  Jwt__Issuer: GearFlow.Api
+  Jwt__Audience: GearFlow.Client
+  DataProtection__KeyPath: /keys
+  Telemetry__Enabled: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.gearflow.svc.cluster.local:4317
