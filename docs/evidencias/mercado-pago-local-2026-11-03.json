@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-03",
+  "accountTestUserVerified": true,
+  "credentialStored": "DPAPI, local ignored file",
+  "amount": 50,
+  "currency": "BRL",
+  "providerOrderId": "ORDTST01M6HH0JAH3DXGJHBETMR50B2N",
+  "status": "Paid",
+  "confirmation": "provider_query",
+  "webhookEnabled": false,
+  "budgetConfirmed": true,
+  "outboxPublished": true,
+  "verifiedOn": "2026-11-03T17:18:40.1655236-03:00",
+  "email": "captured in test",
+  "serviceOrder": "simulated producer",
+  "refundHomologated": false,
+  "localTestsPassed": 150,
+  "remoteTestsPassed": 1
+}

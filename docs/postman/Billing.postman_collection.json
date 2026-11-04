@@ -1,0 +1,173 @@
+{
+  "info": {
+    "description": "Consultas exigem JWT externo com role BillingOperator/BillingAdmin ou service_order_id. Copie approvalToken do e-mail local. Entradas comerciais via Rabbit; webhook exige assinatura.",
+    "name": "GearFlow Billing local",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [],
+        "method": "GET",
+        "url": "{{baseUrl}}/health/live"
+      },
+      "name": "GET /health/live"
+    },
+    {
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [],
+        "method": "GET",
+        "url": "{{baseUrl}}/health/ready"
+      },
+      "name": "GET /health/ready"
+    },
+    {
+      "request": {
+        "auth": {
+          "bearer": [
+            {
+              "type": "string",
+              "value": "{{jwt}}",
+              "key": "token"
+            }
+          ],
+          "type": "bearer"
+        },
+        "header": [],
+        "method": "GET",
+        "url": "{{baseUrl}}/api/budgets/{{budgetId}}"
+      },
+      "name": "GET /api/budgets/{{budgetId}}"
+    },
+    {
+      "request": {
+        "auth": {
+          "bearer": [
+            {
+              "type": "string",
+              "value": "{{jwt}}",
+              "key": "token"
+            }
+          ],
+          "type": "bearer"
+        },
+        "header": [],
+        "method": "GET",
+        "url": "{{baseUrl}}/api/budgets/service-order/{{serviceOrderId}}"
+      },
+      "name": "GET /api/budgets/service-order/{{serviceOrderId}}"
+    },
+    {
+      "request": {
+        "auth": {
+          "bearer": [
+            {
+              "type": "string",
+              "value": "{{jwt}}",
+              "key": "token"
+            }
+          ],
+          "type": "bearer"
+        },
+        "header": [],
+        "method": "GET",
+        "url": "{{baseUrl}}/api/payments/{{paymentId}}"
+      },
+      "name": "GET /api/payments/{{paymentId}}"
+    },
+    {
+      "request": {
+        "auth": {
+          "bearer": [
+            {
+              "type": "string",
+              "value": "{{jwt}}",
+              "key": "token"
+            }
+          ],
+          "type": "bearer"
+        },
+        "header": [],
+        "method": "GET",
+        "url": "{{baseUrl}}/api/payments/budget/{{budgetId}}"
+      },
+      "name": "GET /api/payments/budget/{{budgetId}}"
+    },
+    {
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "url": "{{baseUrl}}/api/budgets/{{budgetId}}/approve?token={{approvalToken}}"
+      },
+      "name": "Confirmar approve (GET não altera)"
+    },
+    {
+      "request": {
+        "body": {
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\"approvalToken\":\"{{approvalToken}}\",\"reason\":\"decisão do cliente\"}",
+          "mode": "raw"
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/budgets/{{budgetId}}/approve"
+      },
+      "name": "PUT approve"
+    },
+    {
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "url": "{{baseUrl}}/api/budgets/{{budgetId}}/reject?token={{approvalToken}}"
+      },
+      "name": "Confirmar reject (GET não altera)"
+    },
+    {
+      "request": {
+        "body": {
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          },
+          "raw": "{\"approvalToken\":\"{{approvalToken}}\",\"reason\":\"decisão do cliente\"}",
+          "mode": "raw"
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/budgets/{{budgetId}}/reject"
+      },
+      "name": "PUT reject"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "date": "2026-11-03",
+  "kubernetes": {
+    "skipped": 0,
+    "errors": 0,
+    "invalid": 0,
+    "render": "kustomize 5.7.1",
+    "valid": 10,
+    "validator": "kubeconform 0.6.7 strict"
+  },
+  "coverage": {
+    "sonarGateApproved": false,
+    "instrumentedLines": 1262,
+    "coveredLines": 1185,
+    "percentage": 93.9
+  },
+  "sdk": "10.0.403",
+  "linuxPublish": true,
+  "infrastructure": {
+    "tests": 9,
+    "mode": "native isolated processes; loopback only",
+    "mongo": "7.0.16",
+    "rabbit": "4.2.0",
+    "erlang": "27.3.4.18"
+  },
+  "projects": [
+    {
+      "notExecuted": 0,
+      "total": 41,
+      "project": "UnitTests",
+      "failed": 0,
+      "passed": 41
+    },
+    {
+      "notExecuted": 0,
+      "total": 10,
+      "project": "ArchitectureTests",
+      "failed": 0,
+      "passed": 10
+    },
+    {
+      "notExecuted": 0,
+      "total": 67,
+      "project": "IntegrationTests",
+      "failed": 0,
+      "passed": 67
+    },
+    {
+      "notExecuted": 0,
+      "total": 22,
+      "project": "BddTests",
+      "failed": 0,
+      "passed": 22
+    }
+  ],
+  "nugetAudit": "no vulnerable packages reported",
+  "limits": [
+    "Docker image and Compose not executed",
+    "OS/provider/email simulated in infrastructure flow",
+    "Not all crash/race combinations exercised"
+  ],
+  "remoteActions": {
+    "sonar": false,
+    "push": false,
+    "deployment": false,
+    "mercadoPago": false
+  },
+  "runtime": "10.0.14"
+}
