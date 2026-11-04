@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><ProjectReference Include="../GearFlow.Billing.Domain/GearFlow.Billing.Domain.csproj" /></ItemGroup>
+</Project>
