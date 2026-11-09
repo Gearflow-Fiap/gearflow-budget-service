@@ -1,0 +1,22 @@
+name: Validar acesso AWS Academy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Autenticar na AWS
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Validar identidade
+        run: aws sts get-caller-identity
