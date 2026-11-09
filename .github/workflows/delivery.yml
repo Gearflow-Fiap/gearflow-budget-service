@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   image:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    if: vars.BILLING_DEPLOY_PROFILE != 'academy' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     permissions: {contents: read, packages: write}
     outputs:
@@ -50,18 +50,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {ref: '${{ github.event.workflow_run.head_sha }}'}
+      - name: Authenticate to AWS Academy
+        if: vars.EKS_CLUSTER_NAME != ''
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Connect to EKS
+        if: vars.EKS_CLUSTER_NAME != ''
+        env:
+          EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
       - name: Validate environment configuration
         env:
           KUBE_CONFIG: ${{ secrets.KUBECONFIG_BASE64 }}
+          EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
           KUBECTL_VERSION: ${{ vars.KUBECTL_VERSION }}
           HOST: ${{ vars.BILLING_HOST }}
         run: |
-          test -n "$KUBE_CONFIG" && test -n "$KUBECTL_VERSION" && test -n "$HOST"
+          test -n "$KUBECTL_VERSION" && test -n "$HOST"
           test "$HOST" != billing.example.invalid
           [[ "$HOST" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] && [[ "$HOST" != *..* ]]
-          mkdir -p "$HOME/.kube"
-          printf '%s' "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
+          if [ -z "$EKS_CLUSTER_NAME" ]; then
+            test -n "$KUBE_CONFIG"
+            mkdir -p "$HOME/.kube"
+            printf '%s' "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+            chmod 600 "$HOME/.kube/config"
+          fi
       - uses: azure/setup-kubectl@v4
         with:
           version: ${{ vars.KUBECTL_VERSION }}

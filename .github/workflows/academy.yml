@@ -1,0 +1,121 @@
+name: Billing Academy EKS
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Billing CI]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: billing-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      vars.BILLING_DEPLOY_PROFILE == 'academy' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: academy
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'gearflow' }}
+      ECR_REPOSITORY: gearflow-billing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-dotnet@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          global-json-file: global.json
+      - name: Test manual deployment
+        if: github.event_name == 'workflow_dispatch'
+        run: dotnet test GearFlow.Billing.sln -c Release
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Connect to cluster
+        run: |
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          version=$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query cluster.version --output text)
+          echo "KUBECTL_VERSION=v$version.0" >> "$GITHUB_ENV"
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      - uses: imranismail/setup-kustomize@v2
+        with: {kustomize-version: 5.7.1}
+      - name: Prepare image registry
+        id: registry
+        run: |
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null; then
+            aws ecr create-repository --repository-name "$ECR_REPOSITORY" --image-tag-mutability IMMUTABLE >/dev/null
+          fi
+          uri=$(aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --query 'repositories[0].repositoryUri' --output text)
+          echo "image=$uri" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git rev-parse HEAD)-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${uri%%/*}"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/GearFlow.Billing.Api/Dockerfile
+          push: true
+          tags: ${{ steps.registry.outputs.image }}:${{ steps.registry.outputs.tag }}
+      - name: Configure namespace and application secrets
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          APPROVAL_SECRET: ${{ secrets.BILLING_APPROVAL_TOKEN_SECRET }}
+          RABBIT_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+        run: |
+          test ${#JWT_SECRET} -ge 32
+          test ${#APPROVAL_SECRET} -ge 32
+          test -n "$RABBIT_PASSWORD"
+          kubectl apply -f k8s/base/namespace.yaml
+          kubectl create secret generic gearflow-billing-secrets -n gearflow \
+            --from-literal=ConnectionStrings__Mongo='mongodb://billing-mongo-0.billing-mongo.gearflow.svc.cluster.local:27017/?replicaSet=rs0' \
+            --from-literal=RabbitMq__Username=gearflow \
+            --from-literal=RabbitMq__Password="$RABBIT_PASSWORD" \
+            --from-literal=Jwt__Secret="$JWT_SECRET" \
+            --from-literal=Billing__ApprovalTokenSecret="$APPROVAL_SECRET" \
+            --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+      - name: Deploy Academy resources
+        env:
+          IMAGE: ${{ steps.registry.outputs.image }}
+          TAG: ${{ steps.registry.outputs.tag }}
+        run: |
+          cd k8s/academy
+          kustomize edit set image "gearflow-billing=$IMAGE:$TAG"
+          kubectl apply -k .
+          kubectl rollout status statefulset/billing-mongo -n gearflow --timeout=600s
+          kubectl exec -n gearflow billing-mongo-0 -- mongosh --quiet --eval \
+            'try { rs.status() } catch(e) { if(e.codeName === "NotYetInitialized") rs.initiate({_id:"rs0",members:[{_id:0,host:"billing-mongo-0.billing-mongo.gearflow.svc.cluster.local:27017"}]}); else throw e; }'
+          for attempt in $(seq 1 30); do
+            if kubectl exec -n gearflow billing-mongo-0 -- mongosh --quiet --eval 'if (!db.hello().isWritablePrimary) quit(1)'; then break; fi
+            if [ "$attempt" -eq 30 ]; then exit 1; fi
+            sleep 2
+          done
+          kubectl rollout status statefulset/rabbitmq -n gearflow --timeout=600s
+          kubectl rollout status deployment/gearflow-billing -n gearflow --timeout=600s
+      - name: Smoke readiness
+        run: |
+          kubectl port-forward -n gearflow service/gearflow-billing 18080:80 >/tmp/billing-forward.log 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/health/ready >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get pods,pvc -n gearflow || true
+          kubectl get events -n gearflow --sort-by=.lastTimestamp | tail -40 || true

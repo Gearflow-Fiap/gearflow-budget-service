@@ -2,6 +2,8 @@
 
 # GearFlow Billing Service
 
+Deploy econômico no cluster EKS `gearflow`: [guia AWS Academy](docs/deploy-academy.md).
+
 **Comece pelo [guia do fluxo completo](docs/README.md):** responsabilidades dos módulos, orçamento, aprovação, Pix/Mercado Pago, mensagens RabbitMQ, execução e compensações.
 
 > Estado: implementação local inclui Rabbit/Inbox/Outbox, SMTP, API/JWT, Pix/webhook/reconciliação, OTEL e arquivos CI/CD/Kubernetes. **150 testes locais aprovados; Pix sandbox de R$ 50 confirmado em teste remoto separado, sem webhook.** Homologação entre serviços, webhook/refund MP e deploy continuam pendentes. [Teste MP local](docs/mercado-pago-local.md). Veja [estado executável](docs/estado-implementacao.md), [contratos entre serviços](docs/integracao-servicos.md) e [operação](docs/operacao.md). As seções arquiteturais abaixo incluem decisões alvo ainda dependentes de alinhamento externo.
