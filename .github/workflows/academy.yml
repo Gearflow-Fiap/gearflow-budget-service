@@ -25,7 +25,6 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'gearflow' }}
       ECR_REPOSITORY: gearflow-billing
-      BROKER_MODE: ${{ vars.BILLING_BROKER_MODE || 'local' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,6 +54,10 @@ jobs:
           version: ${{ env.KUBECTL_VERSION }}
       - uses: imranismail/setup-kustomize@v2
         with: {kustomize-version: 5.7.1}
+      - name: Require shared broker
+        run: |
+          kubectl rollout status statefulset/rabbitmq -n messaging --timeout=120s
+          kubectl get secret rabbitmq-budget-credentials -n messaging >/dev/null
       - name: Prepare image registry
         id: registry
         run: |
@@ -76,26 +79,17 @@ jobs:
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           APPROVAL_SECRET: ${{ secrets.BILLING_APPROVAL_TOKEN_SECRET }}
-          RABBIT_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
         run: |
           test ${#JWT_SECRET} -ge 32
           test ${#APPROVAL_SECRET} -ge 32
-          if [ "$BROKER_MODE" != local ] && [ "$BROKER_MODE" != shared ]; then
-            echo 'BILLING_BROKER_MODE must be local or shared'; exit 1
-          fi
-          if [ "$BROKER_MODE" = local ]; then test -n "$RABBIT_PASSWORD"; fi
           kubectl apply -f k8s/base/namespace.yaml
           kubectl create secret generic gearflow-billing-secrets -n gearflow \
             --from-literal=ConnectionStrings__Mongo='mongodb://billing-mongo-0.billing-mongo.gearflow.svc.cluster.local:27017/?replicaSet=rs0' \
-            --from-literal=RabbitMq__Username=gearflow \
-            --from-literal=RabbitMq__Password="$RABBIT_PASSWORD" \
             --from-literal=Jwt__Secret="$JWT_SECRET" \
             --from-literal=Billing__ApprovalTokenSecret="$APPROVAL_SECRET" \
             --dry-run=client -o yaml | kubectl apply -f - >/dev/null
       - name: Connect to shared broker
-        if: env.BROKER_MODE == 'shared'
         run: |
-          kubectl rollout status statefulset/rabbitmq -n messaging --timeout=120s
           python tools/Sync-SharedBrokerSecret.py
       - name: Select storage profile
         run: |
@@ -105,7 +99,6 @@ jobs:
             profile=k8s/academy-auto
             bash tools/Prepare-AcademyAutoStorage.sh
           fi
-          if [ "$BROKER_MODE" = shared ]; then profile="$profile-shared"; fi
           echo "DEPLOY_DIR=$profile" >> "$GITHUB_ENV"
       - name: Deploy Academy resources
         env:
@@ -123,9 +116,6 @@ jobs:
             if [ "$attempt" -eq 30 ]; then exit 1; fi
             sleep 2
           done
-          if [ "$BROKER_MODE" = local ]; then
-            kubectl rollout status statefulset/rabbitmq -n gearflow --timeout=600s
-          fi
           kubectl rollout status deployment/gearflow-billing -n gearflow --timeout=600s
       - name: Smoke readiness
         run: |

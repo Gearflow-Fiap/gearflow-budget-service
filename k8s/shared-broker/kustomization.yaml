@@ -1,18 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 patches:
-  - patch: |-
-      $patch: delete
-      apiVersion: apps/v1
-      kind: StatefulSet
-      metadata:
-        name: rabbitmq
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: rabbitmq
   - target: {kind: Namespace, name: gearflow}
     patch: |-
       apiVersion: v1

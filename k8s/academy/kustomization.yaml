@@ -4,6 +4,8 @@ namespace: gearflow
 resources:
   - ../base
   - infrastructure.yaml
+components:
+  - ../shared-broker
 patches:
   - patch: |-
       $patch: delete
@@ -50,7 +52,6 @@ patches:
         Billing__PublicBaseUrl: http://localhost:5080
         RabbitMq__Port: "5672"
         RabbitMq__Tls: "false"
-        RabbitMq__QueueType: classic
         Email__Host: mailpit
         Email__Port: "1025"
         Email__EnableSsl: "false"

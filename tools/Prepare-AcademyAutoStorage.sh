@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 # Only replace never-bound claims from the failed standard-driver bootstrap.
 set -euo pipefail
-claims=(gearflow-billing-keys data-billing-mongo-0 data-rabbitmq-0)
-statefulsets=(billing-mongo rabbitmq)
-if [ "${BROKER_MODE:-local}" = shared ]; then
-  claims=(gearflow-billing-keys data-billing-mongo-0)
-  statefulsets=(billing-mongo)
-fi
+claims=(gearflow-billing-keys data-billing-mongo-0)
+statefulsets=(billing-mongo)
 migrate=false
 for claim in "${claims[@]}"; do
   data=$(kubectl get pvc "$claim" -n gearflow --ignore-not-found -o json)
@@ -35,7 +31,6 @@ if [ -n "$(kubectl get deployment gearflow-billing -n gearflow --ignore-not-foun
 fi
 kubectl delete statefulset "${statefulsets[@]}" -n gearflow --ignore-not-found --wait=true
 wait_for_pods app=billing-mongo
-if [ "${BROKER_MODE:-local}" = local ]; then wait_for_pods app=rabbitmq; fi
 for claim in "${claims[@]}"; do
   data=$(kubectl get pvc "$claim" -n gearflow --ignore-not-found -o json)
   if [ -z "$data" ]; then continue; fi

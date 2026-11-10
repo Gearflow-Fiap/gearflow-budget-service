@@ -58,61 +58,6 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: rabbitmq
-spec:
-  clusterIP: None
-  selector: {app: rabbitmq}
-  ports:
-    - {name: amqp, port: 5672}
-    - {name: management, port: 15672}
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: rabbitmq
-spec:
-  serviceName: rabbitmq
-  replicas: 1
-  selector:
-    matchLabels: {app: rabbitmq}
-  template:
-    metadata:
-      labels: {app: rabbitmq}
-    spec:
-      securityContext: {fsGroup: 999}
-      containers:
-        - name: rabbitmq
-          image: rabbitmq:4.2.0-management
-          env:
-            - name: RABBITMQ_DEFAULT_USER
-              valueFrom:
-                secretKeyRef: {name: gearflow-billing-secrets, key: RabbitMq__Username}
-            - name: RABBITMQ_DEFAULT_PASS
-              valueFrom:
-                secretKeyRef: {name: gearflow-billing-secrets, key: RabbitMq__Password}
-          ports:
-            - {name: amqp, containerPort: 5672}
-            - {name: management, containerPort: 15672}
-          resources:
-            requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: "1", memory: 512Mi}
-          readinessProbe:
-            exec:
-              command: [rabbitmq-diagnostics, -q, check_running]
-            periodSeconds: 15
-            timeoutSeconds: 10
-          volumeMounts: [{name: data, mountPath: /var/lib/rabbitmq}]
-  volumeClaimTemplates:
-    - metadata: {name: data}
-      spec:
-        storageClassName: gearflow-gp3
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests: {storage: 1Gi}
----
-apiVersion: v1
-kind: Service
-metadata:
   name: mailpit
 spec:
   selector: {app: mailpit}

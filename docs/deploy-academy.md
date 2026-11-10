@@ -51,12 +51,11 @@ Criar o environment **academy** e cadastrar os secrets nele ou no repositório:
 | AWS_SESSION_TOKEN | Token atual do Academy |
 | JWT_SECRET | Segredo aleatório com pelo menos 32 caracteres; compartilhar com o emissor de JWT do GearFlow |
 | BILLING_APPROVAL_TOKEN_SECRET | Outro segredo aleatório com pelo menos 32 caracteres |
-| RABBITMQ_PASSWORD | Senha aleatória forte e estável para o usuário gearflow |
 
 Não enviar esses valores no chat nem versioná-los. Secrets do environment
 production não são automaticamente disponíveis para academy. Atualizar o trio AWS
-quando expirar. Não trocar a senha do Rabbit apenas no GitHub depois da primeira
-instalação: o usuário já estará persistido e exige rotação também no broker.
+quando expirar. A senha RabbitMQ vem do Secret de serviço gerenciado pelo
+infra-broker no Kubernetes; não há senha do broker nos secrets GitHub do Billing.
 
 ## Executar
 
@@ -71,8 +70,8 @@ com tag única, cria secrets, aplica manifests e verifica /health/ready. Os nós
 baixam a imagem por sua role IAM; não há token temporário GHCR gravado nos pods.
 Configurar uma lifecycle policy no ECR posteriormente para limpar imagens antigas.
 
-Recursos: Billing (uma réplica), Mongo (replica set de um membro), RabbitMQ
-(classic, uma instância), Mailpit e três volumes gp3 totalizando 4 GiB.
+Recursos deste repositório: Billing (uma réplica), Mongo (replica set de um membro),
+Mailpit e dois volumes gp3 totalizando 3 GiB. RabbitMQ pertence ao infra-broker.
 Sem Ingress, HPA, Load Balancer, EFS ou coletor de telemetria. O rollout Recreate
 evita dois pods disputando o volume RWO das chaves; existe breve indisponibilidade.
 
@@ -104,9 +103,8 @@ Abrir http://localhost:8025. Os links de aprovação usam localhost:5080 neste p
 ## Broker em repositório separado
 
 Integração preparada para https://github.com/Gearflow-Fiap/gearflow-infra-broker.
-Por enquanto manter cluster `gearflow`, conta atual e BILLING_BROKER_MODE ausente
-ou `local`. Não alterar cluster/conta nem ativar `shared` até o broker ser
-implantado no mesmo cluster. O CD atual daquele repositório aponta para
+Manter cluster `gearflow` e conta atual. O Billing usa exclusivamente o broker
+compartilhado, sem seletor de modo local. O CD consultado daquele repositório aponta para
 `gearflow-fase4`/outra conta e coordena Terraform; não o executar esperando
 alterar automaticamente o cluster atual.
 
@@ -114,14 +112,13 @@ Quando o broker estiver pronto no namespace `messaging` do cluster de destino:
 
 1. Confirmar StatefulSet rabbitmq pronto e Secret rabbitmq-budget-credentials
    (username gearflow_budget, password) criado pelo infra-broker.
-2. Configurar a Repository variable BILLING_BROKER_MODE=shared no Billing.
-3. Executar Billing Academy EKS. O workflow copia somente a credencial de Budget
+2. Executar Billing Academy EKS. O workflow copia somente a credencial de Budget
    entre namespaces, sem exibi-la, e aplica labels exigidas pela NetworkPolicy.
-4. A conexão passa a rabbitmq.messaging.svc.cluster.local:5672, vhost gearflow,
-   filas quorum. Não usa o usuário administrador ou a senha RABBITMQ_PASSWORD.
+3. A conexão usa rabbitmq.messaging.svc.cluster.local:5672, vhost gearflow,
+   filas quorum. Não usa o usuário administrador nem senha GitHub do RabbitMQ.
 
-O perfil shared não aplica Service/StatefulSet RabbitMQ nem aguarda o broker
-local. O infra-broker continua responsável por usuários, topologia, disco e
+Os perfis Academy não aplicam Service/StatefulSet RabbitMQ nem aguardam o broker
+antigo em gearflow. O infra-broker continua responsável por usuários, topologia, disco e
 ciclo de vida. Remover os manifests do perfil não exclui os objetos antigos:
 o broker local e seu volume permanecem preservados, sem migração automática das
 mensagens. Antes de removê-lo, parar produtores antigos, drenar/migrar filas e
