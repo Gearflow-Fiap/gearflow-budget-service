@@ -101,7 +101,37 @@ kubectl port-forward -n gearflow service/mailpit 8025:8025
 
 Abrir http://localhost:8025. Os links de aprovação usam localhost:5080 neste perfil.
 
-## Falhas comuns e custos
+## Broker em repositório separado
+
+Integração preparada para https://github.com/Gearflow-Fiap/gearflow-infra-broker.
+Por enquanto manter cluster `gearflow`, conta atual e BILLING_BROKER_MODE ausente
+ou `local`. Não alterar cluster/conta nem ativar `shared` até o broker ser
+implantado no mesmo cluster. O CD atual daquele repositório aponta para
+`gearflow-fase4`/outra conta e coordena Terraform; não o executar esperando
+alterar automaticamente o cluster atual.
+
+Quando o broker estiver pronto no namespace `messaging` do cluster de destino:
+
+1. Confirmar StatefulSet rabbitmq pronto e Secret rabbitmq-budget-credentials
+   (username gearflow_budget, password) criado pelo infra-broker.
+2. Configurar a Repository variable BILLING_BROKER_MODE=shared no Billing.
+3. Executar Billing Academy EKS. O workflow copia somente a credencial de Budget
+   entre namespaces, sem exibi-la, e aplica labels exigidas pela NetworkPolicy.
+4. A conexão passa a rabbitmq.messaging.svc.cluster.local:5672, vhost gearflow,
+   filas quorum. Não usa o usuário administrador ou a senha RABBITMQ_PASSWORD.
+
+O perfil shared não aplica Service/StatefulSet RabbitMQ nem aguarda o broker
+local. O infra-broker continua responsável por usuários, topologia, disco e
+ciclo de vida. Remover os manifests do perfil não exclui os objetos antigos:
+o broker local e seu volume permanecem preservados, sem migração automática das
+mensagens. Antes de removê-lo, parar produtores antigos, drenar/migrar filas e
+conferir mensagens pendentes; classic não vira quorum por alteração de config.
+Essa retirada deve ser coordenada entre os dois repositórios.
+
+Trocar de cluster/conta não migra Mongo, chaves de aprovação, filas ou volumes.
+Planejar a cópia de dados e as credenciais AWS quando essa troca for autorizada.
+
+## Diagnóstico e limpeza
 
 - PVC Pending: verificar add-on EBS, permissões IAM, eventos e disponibilidade do
   nó na zona do volume. WaitForFirstConsumer pode manter PVC Pending até existir pod.

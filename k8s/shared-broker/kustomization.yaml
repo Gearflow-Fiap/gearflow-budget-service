@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: rabbitmq
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: rabbitmq
+  - target: {kind: Namespace, name: gearflow}
+    patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: gearflow
+        labels:
+          gearflow.io/messaging-access: "true"
+  - target: {kind: Deployment, name: gearflow-billing}
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: gearflow-billing
+      spec:
+        template:
+          metadata:
+            labels:
+              gearflow.io/rabbitmq-client: "true"
+  - target: {kind: ConfigMap, name: gearflow-billing}
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: gearflow-billing
+      data:
+        RabbitMq__Host: rabbitmq.messaging.svc.cluster.local
+        RabbitMq__VirtualHost: gearflow
+        RabbitMq__QueueType: quorum

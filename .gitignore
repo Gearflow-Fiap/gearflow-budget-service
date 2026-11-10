@@ -12,3 +12,4 @@
 .local/
 *.local.json
 erl_crash.dump
+**/__pycache__/
