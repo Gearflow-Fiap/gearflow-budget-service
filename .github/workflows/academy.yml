@@ -86,12 +86,21 @@ jobs:
             --from-literal=Jwt__Secret="$JWT_SECRET" \
             --from-literal=Billing__ApprovalTokenSecret="$APPROVAL_SECRET" \
             --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+      - name: Select storage profile
+        run: |
+          auto=$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.computeConfig.enabled' --output text)
+          if [ "$auto" = True ] || [ "$auto" = true ]; then
+            echo "DEPLOY_DIR=k8s/academy-auto" >> "$GITHUB_ENV"
+            bash tools/Prepare-AcademyAutoStorage.sh
+          else
+            echo "DEPLOY_DIR=k8s/academy" >> "$GITHUB_ENV"
+          fi
       - name: Deploy Academy resources
         env:
           IMAGE: ${{ steps.registry.outputs.image }}
           TAG: ${{ steps.registry.outputs.tag }}
         run: |
-          cd k8s/academy
+          cd "$DEPLOY_DIR"
           kustomize edit set image "gearflow-billing=$IMAGE:$TAG"
           kubectl apply -k .
           kubectl rollout status statefulset/billing-mongo -n gearflow --timeout=600s

@@ -6,6 +6,15 @@ Execution precisam dos próprios repositórios/deploys para executar a Saga comp
 
 ## Configuração única no console
 
+O workflow detecta `computeConfig.enabled`: clusters Auto Mode usam o overlay
+`k8s/academy-auto` e provisionador `ebs.csi.eks.amazonaws.com`, sem instalar o
+add-on EBS CSI convencional. Para esses clusters, a etapa 1 abaixo não se aplica.
+A primeira correção de um bootstrap anterior pode recriar os StatefulSets e
+somente PVCs antigos Pending sem volume associado. PVCs já vinculados a dados
+bloqueiam a migração automática; nunca são excluídos pelo script. Auto Mode tem
+cobrança adicional de gerenciamento de compute; não é a opção mínima indicada
+para este laboratório. Sua revisão de custos deve ser feita separadamente.
+
 1. EKS > gearflow > Add-ons: instalar **Amazon EBS CSI Driver** na versão compatível.
    O driver precisa de uma identidade IAM com permissões para provisionar EBS;
    use uma associação/role permitida pelo laboratório. Instalar o add-on sem as

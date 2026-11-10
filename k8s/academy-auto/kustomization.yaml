@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../academy
+patches:
+  - target:
+      kind: StorageClass
+      name: gearflow-gp3
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: gearflow-gp3-auto
+      - op: replace
+        path: /provisioner
+        value: ebs.csi.eks.amazonaws.com
+      - op: add
+        path: /allowedTopologies
+        value:
+          - matchLabelExpressions:
+              - key: eks.amazonaws.com/compute-type
+                values: [auto]
+  - target:
+      kind: PersistentVolumeClaim
+      name: gearflow-billing-keys
+    patch: |-
+      - op: replace
+        path: /spec/storageClassName
+        value: gearflow-gp3-auto
+  - target:
+      kind: StatefulSet
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/storageClassName
+        value: gearflow-gp3-auto
