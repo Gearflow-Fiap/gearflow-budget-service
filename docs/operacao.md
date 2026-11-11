@@ -1,5 +1,12 @@
 # Operação e entrega
 
+O pagamento simulado (`MercadoPago__UseMock=true`) retorna confirmação imediata
+para cobranças válidas, sem HTTP Mercado Pago, Pix real ou webhook. O mock usa
+transações locais próprias para consultar o pagamento persistido durante busca,
+reconciliação e reembolso; essas consultas também exigem uma sessão Mongo ativa.
+O fluxo continua validando aprovação e valor do orçamento e persiste Payment,
+Budget e Outbox normalmente. Repetir o comando não duplica os eventos.
+
 ## Desenvolvimento
 
 Copiar .env.example para .env, revisar segredos locais e executar `docker compose --profile app up -d --build`. O perfil ativa Mongo replica set, Rabbit, SMTP Mailpit, HTTP e provedor WireMock. OTEL envia para o coletor local com exportador debug: `docker compose logs otel-collector`. Swagger: http://localhost:5080/swagger; e-mails: http://localhost:8025. Os segredos de exemplo são exclusivos de desenvolvimento. Não remover volumes para atualizar configuração. Docker/Compose ainda não foram executados neste ambiente; Mongo/Rabbit e fluxo Billing foram validados com processos nativos temporários conforme validacao-local.md.

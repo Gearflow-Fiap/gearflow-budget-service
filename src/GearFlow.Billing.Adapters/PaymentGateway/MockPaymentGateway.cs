@@ -6,7 +6,7 @@ using GearFlow.Billing.Domain.Payments;
 namespace GearFlow.Billing.Adapters.PaymentGateway;
 
 // Simulation only: local payment intents supply stable evidence across retries and restarts.
-public sealed class MockPaymentGateway(IPaymentRepository payments) : IPaymentGateway
+public sealed class MockPaymentGateway(IPaymentRepository payments, IUnitOfWork uow) : IPaymentGateway
 {
     private static string OrderId(Guid budgetId) => $"MOCK-{budgetId:N}";
 
@@ -21,7 +21,7 @@ public sealed class MockPaymentGateway(IPaymentRepository payments) : IPaymentGa
     {
         if (!orderId.StartsWith("MOCK-", StringComparison.Ordinal) || !Guid.TryParseExact(orderId[5..], "N", out var budgetId))
             throw new GatewayException("mock.order_not_found", false, "Unknown simulated order.");
-        var payment = await payments.FindByBudgetAsync(budgetId, ct)
+        var payment = await uow.ExecuteAsync(token => payments.FindByBudgetAsync(budgetId, token), ct)
             ?? throw new GatewayException("mock.order_not_found", false, "Simulated payment intent is missing.");
         var status = payment.Status switch
         {
@@ -35,7 +35,7 @@ public sealed class MockPaymentGateway(IPaymentRepository payments) : IPaymentGa
 
     public async Task<GatewayPayment?> FindByBudgetAsync(Guid budgetId, DateTimeOffset createdOn, CancellationToken ct)
     {
-        var payment = await payments.FindByBudgetAsync(budgetId, ct);
+        var payment = await uow.ExecuteAsync(token => payments.FindByBudgetAsync(budgetId, token), ct);
         return payment?.ProviderOrderId is { } id ? await GetAsync(id, ct) : null;
     }
 
