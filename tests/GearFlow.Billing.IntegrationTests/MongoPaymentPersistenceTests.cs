@@ -21,6 +21,34 @@ public sealed class MongoFactAttribute : FactAttribute
 
 public class MongoPaymentPersistenceTests
 {
+    [MongoFact]
+    public Task Mock_payment_confirms_and_refunds_with_real_transactions_and_idempotent_events() => WithDatabase(async (database, client) =>
+    {
+        var clock = new Clock(); var uow = new MongoSession(client); var store = new MongoBillingStore(database, uow, clock);
+        var budget = new Budget(Guid.NewGuid(), Guid.NewGuid(), new Customer("Teste mock", new EmailAddress("mock@example.invalid")),
+            [new BudgetItem(Guid.NewGuid(), BudgetItemType.Job, "Pagamento simulado", new Money(50), 1)], clock.UtcNow, clock.UtcNow.AddDays(1));
+        budget.Approve(clock.UtcNow);
+        await uow.ExecuteAsync(async ct => { await store.AddAsync(budget, ct); return true; }, default);
+        var gateway = new GearFlow.Billing.Adapters.PaymentGateway.MockPaymentGateway(store, uow);
+        GearFlow.Billing.Application.Payments.PaymentWorkflow Workflow() => new(store, store, store, store, uow, gateway, clock);
+        var command = new GearFlow.Billing.Application.Payments.RequestPaymentCommand(budget.ServiceOrderId, budget.Id, new Money(50));
+        Assert.True((await Workflow().RequestAsync(command, default)).IsSuccess);
+        Assert.True((await Workflow().RequestAsync(command, default)).IsSuccess);
+        var payment = (await uow.ExecuteAsync(ct => store.FindByBudgetAsync(budget.Id, ct), default))!;
+        Assert.Equal(GearFlow.Billing.Domain.Payments.PaymentStatus.Paid, payment.Status);
+        Assert.Equal(BudgetStatus.Paid, (await uow.ExecuteAsync(ct => store.GetAsync(budget.Id, ct), default))!.Status);
+        gateway = new GearFlow.Billing.Adapters.PaymentGateway.MockPaymentGateway(store, uow);
+        Assert.Equal(GatewayStatus.Paid, (await gateway.GetAsync(payment.ProviderOrderId!, default)).Status);
+        var refund = new GearFlow.Billing.Application.Payments.RefundPaymentCommand(budget.ServiceOrderId, budget.Id, payment.Id, "Teste simulado");
+        Assert.True((await Workflow().RefundAsync(refund, default)).IsSuccess);
+        Assert.True((await Workflow().RefundAsync(refund, default)).IsSuccess);
+        Assert.Equal(GatewayStatus.Refunded, (await gateway.GetAsync(payment.ProviderOrderId!, default)).Status);
+        var events = await database.GetCollection<BsonDocument>("outbox").Find(FilterDefinition<BsonDocument>.Empty).ToListAsync();
+        Assert.Single(events, e => e["type"] == nameof(PaymentRequested));
+        Assert.Single(events, e => e["type"] == nameof(PaymentConfirmed));
+        Assert.Single(events, e => e["type"] == nameof(PaymentRefunded));
+    });
+
     private sealed class Clock : IClock { public DateTimeOffset UtcNow => DateTimeOffset.Parse("2026-11-02T12:00:00Z"); }
     private static async Task WithDatabase(Func<IMongoDatabase, MongoClient, Task> test)
     {

@@ -15,7 +15,7 @@ public class PaymentScenarios
     public async Task Mock_confirms_immediately_and_refunds_without_webhook_preserving_events_on_retry()
     {
         var store = new Store();
-        var gateway = new GearFlow.Billing.Adapters.PaymentGateway.MockPaymentGateway(store);
+        var gateway = new GearFlow.Billing.Adapters.PaymentGateway.MockPaymentGateway(store, store);
         PaymentWorkflow Workflow() => new(store, store, store, store, store, gateway, store);
         var command = store.Command();
         Assert.True((await Workflow().RequestAsync(command, default)).IsSuccess);
@@ -27,7 +27,7 @@ public class PaymentScenarios
         Assert.Single(store.Outbox.OfType<PaymentConfirmed>());
 
         // Recreate the adapter to exercise recovery without process-local mock state.
-        gateway = new GearFlow.Billing.Adapters.PaymentGateway.MockPaymentGateway(store);
+        gateway = new GearFlow.Billing.Adapters.PaymentGateway.MockPaymentGateway(store, store);
         Assert.Equal(GatewayStatus.Paid, (await gateway.GetAsync(store.PaymentState.ProviderOrderId!, default)).Status);
         var refund = new RefundPaymentCommand(command.ServiceOrderId, command.BudgetId, store.PaymentState.Id, "Sem estoque");
         Assert.True((await Workflow().RefundAsync(refund, default)).IsSuccess);
@@ -63,7 +63,11 @@ public class PaymentScenarios
             BudgetState = budget.Snapshot(); return Task.CompletedTask;
         }
         Task<Payment?> IPaymentRepository.GetAsync(Guid id, CancellationToken ct) => Task.FromResult(PaymentState?.Id == id ? Payment.Restore(PaymentState) : null);
-        public Task<Payment?> FindByBudgetAsync(Guid id, CancellationToken ct) => Task.FromResult(PaymentState?.BudgetId == id ? Payment.Restore(PaymentState) : null);
+        public Task<Payment?> FindByBudgetAsync(Guid id, CancellationToken ct)
+        {
+            Assert.True(InTransaction, "Payment repository reads require an active transaction, as Mongo does.");
+            return Task.FromResult(PaymentState?.BudgetId == id ? Payment.Restore(PaymentState) : null);
+        }
         public Task AddAsync(Payment payment, CancellationToken ct)
         {
             Assert.True(InTransaction); if (PaymentState is not null) throw new DuplicateException();
