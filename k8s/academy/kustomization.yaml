@@ -55,4 +55,33 @@ patches:
         Email__Host: mailpit
         Email__Port: "1025"
         Email__EnableSsl: "false"
-        Telemetry__Enabled: "false"
+        # Telemetria ligada, direto para o New Relic (o mesmo da Fase 3 e do Inventory/OS/Operation). O OTEL_EXPORTER_OTLP_ENDPOINT do base
+        # aponta para um otel-collector que não existe no cluster; aqui ele é sobrescrito. O header api-key vem do Deployment (abaixo).
+        Telemetry__Enabled: "true"
+        OTEL_EXPORTER_OTLP_ENDPOINT: https://otlp.nr-data.net:4317
+        OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  # A licença vem do Secret `newrelic-apm-secret` (chave NEW_RELIC_LICENSE_KEY) do namespace gearflow, que o delivery do Inventory grava.
+  # Sem ele o Pod sobe normalmente e o New Relic apenas rejeita a exportação.
+  - target:
+      kind: Deployment
+      name: gearflow-billing
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: gearflow-billing
+      spec:
+        template:
+          spec:
+            containers:
+              - name: billing
+                env:
+                  # O $(...) é expandido pelo Kubernetes e exige que NEW_RELIC_LICENSE_KEY venha ANTES nesta lista.
+                  - name: NEW_RELIC_LICENSE_KEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: newrelic-apm-secret
+                        key: NEW_RELIC_LICENSE_KEY
+                        optional: true
+                  - name: OTEL_EXPORTER_OTLP_HEADERS
+                    value: "api-key=$(NEW_RELIC_LICENSE_KEY)"
