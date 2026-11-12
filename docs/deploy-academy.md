@@ -75,6 +75,14 @@ Mailpit e dois volumes gp3 totalizando 3 GiB. RabbitMQ pertence ao infra-broker.
 Sem Ingress, HPA, Load Balancer, EFS ou coletor de telemetria. O rollout Recreate
 evita dois pods disputando o volume RWO das chaves; existe breve indisponibilidade.
 
+A telemetria vai **direto para o New Relic**, sem coletor: o perfil liga `Telemetry__Enabled`, aponta
+`OTEL_EXPORTER_OTLP_ENDPOINT` para `https://otlp.nr-data.net:4317` (gRPC) e monta o header `api-key`
+(`OTEL_EXPORTER_OTLP_HEADERS`) a partir do Secret `newrelic-apm-secret`, chave `NEW_RELIC_LICENSE_KEY`,
+do namespace `gearflow`. Este repositório não cria o Secret: o delivery do Inventory o grava a partir do secret
+`NEW_RELIC_LICENSE_KEY` do GitHub. O Pod lê o Secret só na subida; se ele surgir depois do deploy do Billing,
+reinicie o Deployment (`kubectl rollout restart deployment/gearflow-billing -n gearflow`). Sem o Secret o Billing
+sobe normalmente e o New Relic recusa a exportação. O `service.name` no New Relic é `gearflow-budget-service`.
+
 O perfil usa **Development** explicitamente: Mongo sem autenticação, Rabbit/SMTP
 sem TLS, pagamentos simulados e Swagger habilitado. É um ambiente de demonstração
 com serviços ClusterIP, não uma configuração de produção. E-mails ficam no Mailpit;
